@@ -1,0 +1,1012 @@
+From be02bcc82b8851c8f6cf9bbff0e8c574a0824508 Mon Sep 17 00:00:00 2001
+From: vasia <vasiliki.kalavri@inf.ethz.ch>
+Date: Fri, 7 Sep 2018 15:37:34 +0200
+Subject: [PATCH] Add instrumentation for ds2
+
+---
+ .../flink/runtime/execution/Environment.java       |  15 +-
+ .../io/network/api/writer/RecordWriter.java        |  38 +++-
+ .../runtime/taskmanager/RuntimeEnvironment.java    |  17 +-
+ .../runtime/util/profiling/MetricsManager.java     | 232 +++++++++++++++++++++
+ .../runtime/util/profiling/ProcessingStatus.java   | 110 ++++++++++
+ .../operators/testutils/DummyEnvironment.java      |   6 +
+ .../operators/testutils/MockEnvironment.java       |   6 +
+ .../streaming/runtime/io/RecordWriterOutput.java   |   6 +-
+ .../streaming/runtime/io/StreamInputProcessor.java |  34 +++
+ .../runtime/io/StreamTwoInputProcessor.java        |  42 +++-
+ .../runtime/tasks/OneInputStreamTask.java          |   3 +
+ .../streaming/runtime/tasks/OperatorChain.java     |   9 +-
+ .../flink/streaming/runtime/tasks/StreamTask.java  |   5 +
+ .../runtime/tasks/TwoInputStreamTask.java          |   3 +
+ .../runtime/tasks/StreamMockEnvironment.java       |   6 +
+ 15 files changed, 514 insertions(+), 18 deletions(-)
+ create mode 100644 workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/util/profiling/MetricsManager.java
+ create mode 100644 workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/util/profiling/ProcessingStatus.java
+
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/execution/Environment.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/execution/Environment.java
+index 203ee85..e733188 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/execution/Environment.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/execution/Environment.java
+@@ -38,6 +38,7 @@ import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
+ import org.apache.flink.runtime.query.TaskKvStateRegistry;
+ import org.apache.flink.runtime.state.internal.InternalKvState;
+ import org.apache.flink.runtime.taskmanager.TaskManagerRuntimeInfo;
++import org.apache.flink.runtime.util.profiling.MetricsManager;
+ 
+ import java.util.Map;
+ import java.util.concurrent.Future;
+@@ -87,16 +88,16 @@ public interface Environment {
+ 
+ 	/**
+ 	 * Gets the task manager info, with configuration and hostname.
+-	 * 
+-	 * @return The task manager info, with configuration and hostname. 
++	 *
++	 * @return The task manager info, with configuration and hostname.
+ 	 */
+ 	TaskManagerRuntimeInfo getTaskManagerInfo();
+ 
+ 	/**
+ 	 * Returns the task specific metric group.
+-	 * 
++	 *
+ 	 * @return The MetricGroup of this task.
+-     */
++	 */
+ 	TaskMetricGroup getMetricGroup();
+ 
+ 	/**
+@@ -161,7 +162,7 @@ public interface Environment {
+ 	 * Confirms that the invokable has successfully completed all steps it needed to
+ 	 * to for the checkpoint with the give checkpoint-ID. This method does not include
+ 	 * any state in the checkpoint.
+-	 * 
++	 *
+ 	 * @param checkpointId ID of this checkpoint
+ 	 * @param checkpointMetrics metrics for this checkpoint
+ 	 */
+@@ -181,7 +182,7 @@ public interface Environment {
+ 	/**
+ 	 * Declines a checkpoint. This tells the checkpoint coordinator that this task will
+ 	 * not be able to successfully complete a certain checkpoint.
+-	 * 
++	 *
+ 	 * @param checkpointId The ID of the declined checkpoint.
+ 	 * @param cause An optional reason why the checkpoint was declined.
+ 	 */
+@@ -209,4 +210,6 @@ public interface Environment {
+ 	InputGate getInputGate(int index);
+ 
+ 	InputGate[] getAllInputGates();
++
++	MetricsManager getMetricsManager();
+ }
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/io/network/api/writer/RecordWriter.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/io/network/api/writer/RecordWriter.java
+index c698ff5..1a2d652 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/io/network/api/writer/RecordWriter.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/io/network/api/writer/RecordWriter.java
+@@ -27,6 +27,7 @@ import org.apache.flink.runtime.event.AbstractEvent;
+ import org.apache.flink.runtime.io.network.api.serialization.RecordSerializer;
+ import org.apache.flink.runtime.io.network.api.serialization.SpanningRecordSerializer;
+ import org.apache.flink.runtime.io.network.buffer.Buffer;
++import org.apache.flink.runtime.util.profiling.MetricsManager;
+ import org.apache.flink.util.XORShiftRandom;
+ 
+ import java.io.IOException;
+@@ -62,6 +63,8 @@ public class RecordWriter<T extends IOReadableWritable> {
+ 
+ 	private Counter numBytesOut = new SimpleCounter();
+ 
++	private MetricsManager metricsManager;
++
+ 	public RecordWriter(ResultPartitionWriter writer) {
+ 		this(writer, new RoundRobinChannelSelector<T>());
+ 	}
+@@ -110,9 +113,18 @@ public class RecordWriter<T extends IOReadableWritable> {
+ 	private void sendToTarget(T record, int targetChannel) throws IOException, InterruptedException {
+ 		RecordSerializer<T> serializer = serializers[targetChannel];
+ 
++		metricsManager.incRecordsOut();
++
+ 		synchronized (serializer) {
++
++			long start = System.nanoTime();
++
+ 			SerializationResult result = serializer.addRecord(record);
+ 
++			long end = System.nanoTime();
++			// add serialization duration to the MetricsManager
++			metricsManager.addSerialization(end - start);
++
+ 			while (result.isFullBuffer()) {
+ 				Buffer buffer = serializer.getCurrentBuffer();
+ 
+@@ -129,9 +141,21 @@ public class RecordWriter<T extends IOReadableWritable> {
+ 						break;
+ 					}
+ 				} else {
++					long bufferStart = System.nanoTime();
++
+ 					buffer = targetPartition.getBufferProvider().requestBufferBlocking();
++
++					long bufferEnd = System.nanoTime();
++
++					if (bufferEnd - bufferStart > 0) {
++						// add waiting duration to the MetricsManager
++						metricsManager.addWaitingForWriteBufferDuration(bufferEnd - bufferStart);
++					}
+ 					result = serializer.setNextBuffer(buffer);
+ 				}
++
++				// inform the MetricsManager that the buffer is full
++				metricsManager.outputBufferFull(System.nanoTime());
+ 			}
+ 		}
+ 	}
+@@ -165,6 +189,8 @@ public class RecordWriter<T extends IOReadableWritable> {
+ 	}
+ 
+ 	public void flush() throws IOException {
++
++		long start = System.nanoTime();
+ 		for (int targetChannel = 0; targetChannel < numChannels; targetChannel++) {
+ 			RecordSerializer<T> serializer = serializers[targetChannel];
+ 
+@@ -181,6 +207,12 @@ public class RecordWriter<T extends IOReadableWritable> {
+ 				}
+ 			}
+ 		}
++		long end = System.nanoTime();
++		// add serialization duration to the MetricsManager
++		metricsManager.addSerialization(end - start);
++
++		// inform the MetricsManager that the buffer is consumed
++		metricsManager.outputBufferFull(System.nanoTime());
+ 	}
+ 
+ 	public void clearBuffers() {
+@@ -203,7 +235,7 @@ public class RecordWriter<T extends IOReadableWritable> {
+ 	/**
+ 	 * Sets the metric group for this RecordWriter.
+ 	 * @param metrics
+-     */
++	 */
+ 	public void setMetricGroup(TaskIOMetricGroup metrics) {
+ 		numBytesOut = metrics.getNumBytesOutCounter();
+ 	}
+@@ -227,4 +259,8 @@ public class RecordWriter<T extends IOReadableWritable> {
+ 		}
+ 	}
+ 
++	public void setMetricsManager(MetricsManager metricsManager) {
++		this.metricsManager = metricsManager;
++	}
++
+ }
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/taskmanager/RuntimeEnvironment.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/taskmanager/RuntimeEnvironment.java
+index 92b5886..5c8134f 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/taskmanager/RuntimeEnvironment.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/taskmanager/RuntimeEnvironment.java
+@@ -37,6 +37,7 @@ import org.apache.flink.runtime.jobgraph.tasks.InputSplitProvider;
+ import org.apache.flink.runtime.memory.MemoryManager;
+ import org.apache.flink.runtime.metrics.groups.TaskMetricGroup;
+ import org.apache.flink.runtime.query.TaskKvStateRegistry;
++import org.apache.flink.runtime.util.profiling.MetricsManager;
+ 
+ import java.util.Map;
+ import java.util.concurrent.Future;
+@@ -51,9 +52,9 @@ public class RuntimeEnvironment implements Environment {
+ 	private final JobID jobId;
+ 	private final JobVertexID jobVertexId;
+ 	private final ExecutionAttemptID executionId;
+-	
++
+ 	private final TaskInfo taskInfo;
+-	
++
+ 	private final Configuration jobConfiguration;
+ 	private final Configuration taskConfiguration;
+ 	private final ExecutionConfig executionConfig;
+@@ -64,12 +65,12 @@ public class RuntimeEnvironment implements Environment {
+ 	private final IOManager ioManager;
+ 	private final BroadcastVariableManager bcVarManager;
+ 	private final InputSplitProvider splitProvider;
+-	
++
+ 	private final Map<String, Future<Path>> distCacheEntries;
+ 
+ 	private final ResultPartitionWriter[] writers;
+ 	private final InputGate[] inputGates;
+-	
++
+ 	private final CheckpointResponder checkpointResponder;
+ 
+ 	private final AccumulatorRegistry accumulatorRegistry;
+@@ -81,6 +82,8 @@ public class RuntimeEnvironment implements Environment {
+ 
+ 	private final Task containingTask;
+ 
++	private final MetricsManager metricsManager;
++
+ 	// ------------------------------------------------------------------------
+ 
+ 	public RuntimeEnvironment(
+@@ -127,6 +130,7 @@ public class RuntimeEnvironment implements Environment {
+ 		this.taskManagerInfo = checkNotNull(taskManagerInfo);
+ 		this.containingTask = containingTask;
+ 		this.metrics = metrics;
++		this.metricsManager = new MetricsManager(taskInfo.getTaskNameWithSubtasks(), jobConfiguration);
+ 	}
+ 
+ 	// ------------------------------------------------------------------------
+@@ -237,6 +241,11 @@ public class RuntimeEnvironment implements Environment {
+ 	}
+ 
+ 	@Override
++	public MetricsManager getMetricsManager() {
++		return metricsManager;
++	}
++
++	@Override
+ 	public void acknowledgeCheckpoint(long checkpointId, CheckpointMetrics checkpointMetrics) {
+ 		acknowledgeCheckpoint(checkpointId, checkpointMetrics, null);
+ 	}
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/util/profiling/MetricsManager.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/util/profiling/MetricsManager.java
+new file mode 100644
+index 0000000..a9359d3
+--- /dev/null
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/util/profiling/MetricsManager.java
+@@ -0,0 +1,232 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.apache.flink.runtime.util.profiling;
++
++import org.apache.flink.configuration.Configuration;
++
++import java.io.IOException;
++import java.io.Serializable;
++import java.nio.charset.Charset;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.Paths;
++import java.util.Arrays;
++import java.util.List;
++
++/**
++ * The MetricsManager is responsible for logging activity profiling information (except for messages).
++ * It gathers start and end events for deserialization, processing, serialization, blocking on read and write buffers
++ * and records activity durations. There is one MetricsManager instance per Task (operator instance).
++ * The MetricsManager aggregates metrics in a {@link ProcessingStatus} object and outputs processing and output rates
++ * periodically to a designated rates file.
++ */
++public class MetricsManager implements Serializable {
++
++	private final String taskId; // Flink's task description
++	private final String workerName; // The task description string logged in the rates file
++	private final int instanceId; // The operator instance id
++	private final int numInstances; // The total number of instances for this operator
++
++	private long recordsIn = 0;	// Total number of records ingested since the last flush
++	private long recordsOut = 0;	// Total number of records produced since the last flush
++	private long usefulTime = 0;	// Total period of useful time since last flush
++	private long waitingTime = 0;	// Total waiting time for input/output buffers since last flush
++
++	private long currentWindowStart;
++
++	private final ProcessingStatus status;
++
++	private final long windowSize;	// The aggregation interval
++	private  final String ratesPath;	// The file path where to output aggregated rates
++
++	private long epoch = 0;	// The current aggregation interval. The MetricsManager outputs one rates file per epoch.
++
++	/**
++	 * @param taskDescription the String describing the owner operator instance
++	 * @param jobConfiguration this job's configuration
++	 */
++	public MetricsManager(String taskDescription, Configuration jobConfiguration) {
++		taskId = taskDescription;
++		String workerId = taskId.replace("Timestamps/Watermarks", "Timestamps-Watermarks");
++		workerName = workerId.substring(0, workerId.indexOf("(")-1);
++		instanceId = Integer.parseInt(workerId.substring(workerId.indexOf("(")+1, workerId.indexOf("/")));
++		numInstances = Integer.parseInt(workerId.substring(workerId.indexOf("/")+1, workerId.indexOf(")")));
++		status = new ProcessingStatus();
++		windowSize = jobConfiguration.getLong("policy.windowSize",  10_000_000_000L);
++		ratesPath = jobConfiguration.getString("policy.rates.path", "rates/");
++		currentWindowStart = status.getProcessingStart();
++	}
++
++	/**
++	 * Once the current input buffer has been consumed, calculate and log useful and waiting durations
++	 * for this buffer.
++	 * @param timestamp the end buffer timestamp
++	 * @param deserialization total duration of deserialization for this buffer
++	 * @param processing total duration of processing for this buffer
++	 * @param numRecords total number of records processed
++	 */
++	public void inputBufferConsumed(long timestamp, long deserialization, long processing, long numRecords) {
++
++		synchronized (status) {
++			if (currentWindowStart == 0) {
++				currentWindowStart = timestamp;
++			}
++
++			status.setProcessingEnd(timestamp);
++
++			// aggregate the metrics
++			recordsIn += numRecords;
++			recordsOut += status.getNumRecordsOut();
++			usefulTime += processing + status.getSerializationDuration() + deserialization
++				- status.getWaitingForWriteBufferDuration();
++
++			// clear status counters
++			status.clearCounters();
++
++			// if window size is reached => output
++			if (timestamp - currentWindowStart > windowSize) {
++
++				// compute rates
++				long duration = timestamp - currentWindowStart;
++				double trueProcessingRate = (recordsIn / (usefulTime / 1000.0)) * 1000000;
++				double trueOutputRate = (recordsOut / (usefulTime / 1000.0)) * 1000000;
++				double observedProcessingRate = (recordsIn / (duration / 1000.0)) * 1000000;
++				double observedOutputRate = (recordsOut / (duration / 1000.0)) * 1000000;
++
++				// log the rates: one file per epoch
++				String ratesLine = workerName + ","
++					+ instanceId  + ","
++					+ numInstances  + ","
++					+ currentWindowStart + ","
++					+ trueProcessingRate + ","
++					+ trueOutputRate + ","
++					+ observedProcessingRate + ","
++					+ observedOutputRate;
++				List<String> rates = Arrays.asList(ratesLine);
++
++				Path ratesFile = Paths.get(ratesPath + workerName.trim() + "-" + instanceId + "-" + epoch).toAbsolutePath();
++				try {
++					Files.write(ratesFile, rates, Charset.forName("UTF-8"));
++				} catch (IOException e) {
++					System.err.println("Error while writing rates file for epoch " + epoch
++						+ " on task " + taskId + ".");
++					e.printStackTrace();
++				}
++
++				// clear counters
++				recordsIn = 0;
++				recordsOut = 0;
++				usefulTime = 0;
++				currentWindowStart = 0;
++				epoch++;
++			}
++		}
++	}
++
++	/**
++	 * A new input buffer has been retrieved with the given timestamp.
++	 */
++	public void newInputBuffer(long timestamp) {
++		status.setProcessingStart(timestamp);
++		// the time between the end of the previous buffer processing and timestamp is "waiting for input" time
++		status.setWaitingForReadBufferDuration(timestamp - status.getProcessingEnd());
++	}
++
++	public void addSerialization(long serializationDuration) {
++		status.addSerialization(serializationDuration);
++	}
++
++	public void incRecordsOut() {
++		status.incRecordsOut();
++	}
++
++	public void addWaitingForWriteBufferDuration(long duration) {
++		status.addWaitingForWriteBuffer(duration);
++
++	}
++
++	/**
++	 * The source consumes no input, thus it must log metrics whenever it writes an output buffer.
++	 * @param timestamp the timestamp when the current output buffer got full.
++	 */
++	public void outputBufferFull(long timestamp) {
++		if (taskId.contains("Source")) {
++
++			synchronized (status) {
++
++				if (currentWindowStart == 0) {
++					currentWindowStart = timestamp;
++				}
++
++				setOutBufferStart(timestamp);
++
++				// aggregate the metrics
++				recordsOut += status.getNumRecordsOut();
++				if (status.getWaitingForWriteBufferDuration() > 0) {
++					waitingTime += status.getWaitingForWriteBufferDuration();
++				}
++
++				// clear status counters
++				status.clearCounters();
++
++				// if window size is reached => output
++				if (timestamp - currentWindowStart > windowSize) {
++
++					// compute rates
++					long duration = timestamp - currentWindowStart;
++					usefulTime = duration - waitingTime;
++					double trueOutputRate = (recordsOut / (usefulTime / 1000.0)) * 1000000;
++					double observedOutputRate = (recordsOut / (duration / 1000.0)) * 1000000;
++
++
++					// log the rates: one file per epoch
++					String ratesLine = workerName + ","
++						+ instanceId  + ","
++						+ numInstances  + ","
++						+ currentWindowStart + ","
++						+ 0 + ","
++						+ trueOutputRate + ","
++						+ 0 + ","
++						+ observedOutputRate;
++					List<String> rates = Arrays.asList(ratesLine);
++
++					Path ratesFile = Paths.get(ratesPath + workerName.trim() + "-" + instanceId + "-" + epoch).toAbsolutePath();
++					try {
++						Files.write(ratesFile, rates, Charset.forName("UTF-8"));
++					} catch (IOException e) {
++						System.err.println("Error while writing rates file for epoch " + epoch
++							+ " on task " + taskId + ".");
++						e.printStackTrace();
++					}
++
++					// clear counters
++					recordsOut = 0;
++					usefulTime = 0;
++					waitingTime = 0;
++					currentWindowStart = 0;
++					epoch++;
++				}
++			}
++		}
++	}
++
++	private void setOutBufferStart(long start) {
++		status.setOutBufferStart(start);
++	}
++}
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/util/profiling/ProcessingStatus.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/util/profiling/ProcessingStatus.java
+new file mode 100644
+index 0000000..b03f1e6
+--- /dev/null
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/main/java/org/apache/flink/runtime/util/profiling/ProcessingStatus.java
+@@ -0,0 +1,110 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package org.apache.flink.runtime.util.profiling;
++
++import java.io.Serializable;
++
++/**
++ * This class maintains information regarding the processing progress of a worker per input buffer.
++ * It updates activity durations so that the {@link MetricsManager} can log accurate profiling data.
++ */
++public class ProcessingStatus implements Serializable {
++
++    // the timestamp of an the event that we got a new buffer to process
++    private long processingStart;
++
++    private long processingEnd;
++
++    // the total time spent on serialization for this buffer so far
++    private long serializationDuration;
++
++    private long outputRecords;
++
++    // the total time spent waiting to acquire a write buffer (to be subtracted from processing)
++    private long waitingForWriteBufferDuration;
++
++    private long waitingForReadBufferDuration;
++
++    private long outBufferStart;
++
++    ProcessingStatus() {
++        processingStart = System.nanoTime();
++        processingEnd = System.nanoTime();
++        serializationDuration = 0;
++        waitingForReadBufferDuration = 0;
++        waitingForWriteBufferDuration = 0;
++        outputRecords = 0;
++        outBufferStart = System.nanoTime();
++    }
++
++    long getProcessingEnd() {
++        return processingEnd;
++    }
++
++    void setOutBufferStart(long start) {
++        outBufferStart = start;
++    }
++
++    void setProcessingStart(long processingStart) {
++        this.processingStart = processingStart;
++    }
++
++    long getProcessingStart() {
++        return processingStart;
++    }
++
++    void setProcessingEnd(long processingEnd) {
++        this.processingEnd = processingEnd;
++    }
++
++    long getSerializationDuration() {
++        return serializationDuration;
++    }
++
++    void addSerialization(long duration) {
++        serializationDuration += duration;
++    }
++
++    long getWaitingForWriteBufferDuration() {
++        return waitingForWriteBufferDuration;
++    }
++
++    void addWaitingForWriteBuffer(long duration) {
++        waitingForWriteBufferDuration += duration;
++    }
++
++    void setWaitingForReadBufferDuration(long duration) {
++        this.waitingForReadBufferDuration = duration;
++    }
++
++    public long getNumRecordsOut() {
++        return outputRecords;
++    }
++
++    void clearCounters() {
++        serializationDuration = 0;
++        waitingForWriteBufferDuration = 0;
++        waitingForReadBufferDuration = 0;
++        outputRecords = 0;
++    }
++
++    void incRecordsOut() {
++        outputRecords++;
++    }
++}
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/test/java/org/apache/flink/runtime/operators/testutils/DummyEnvironment.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/test/java/org/apache/flink/runtime/operators/testutils/DummyEnvironment.java
+index 8ed06b2..56b8ef3 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/test/java/org/apache/flink/runtime/operators/testutils/DummyEnvironment.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/test/java/org/apache/flink/runtime/operators/testutils/DummyEnvironment.java
+@@ -40,6 +40,7 @@ import org.apache.flink.runtime.query.KvStateRegistry;
+ import org.apache.flink.runtime.query.TaskKvStateRegistry;
+ import org.apache.flink.runtime.taskmanager.TaskManagerRuntimeInfo;
+ import org.apache.flink.runtime.util.TestingTaskManagerRuntimeInfo;
++import org.apache.flink.runtime.util.profiling.MetricsManager;
+ 
+ import java.util.Collections;
+ import java.util.Map;
+@@ -189,4 +190,9 @@ public class DummyEnvironment implements Environment {
+ 		return null;
+ 	}
+ 
++	@Override
++	public MetricsManager getMetricsManager() {
++		return null;
++	}
++
+ }
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/test/java/org/apache/flink/runtime/operators/testutils/MockEnvironment.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/test/java/org/apache/flink/runtime/operators/testutils/MockEnvironment.java
+index 7514cc4..92ccfeb 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/test/java/org/apache/flink/runtime/operators/testutils/MockEnvironment.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-runtime/src/test/java/org/apache/flink/runtime/operators/testutils/MockEnvironment.java
+@@ -48,6 +48,7 @@ import org.apache.flink.runtime.query.KvStateRegistry;
+ import org.apache.flink.runtime.query.TaskKvStateRegistry;
+ import org.apache.flink.runtime.taskmanager.TaskManagerRuntimeInfo;
+ import org.apache.flink.runtime.util.TestingTaskManagerRuntimeInfo;
++import org.apache.flink.runtime.util.profiling.MetricsManager;
+ import org.apache.flink.types.Record;
+ import org.apache.flink.util.MutableObjectIterator;
+ import org.apache.flink.util.Preconditions;
+@@ -324,6 +325,11 @@ public class MockEnvironment implements Environment {
+ 	}
+ 
+ 	@Override
++	public MetricsManager getMetricsManager() {
++		return null;
++	}
++
++	@Override
+ 	public JobVertexID getJobVertexId() {
+ 		return new JobVertexID(new byte[16]);
+ 	}
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/RecordWriterOutput.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/RecordWriterOutput.java
+index 3b70be7..2f36a51 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/RecordWriterOutput.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/RecordWriterOutput.java
+@@ -22,6 +22,7 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
+ import org.apache.flink.runtime.event.AbstractEvent;
+ import org.apache.flink.runtime.io.network.api.writer.RecordWriter;
+ import org.apache.flink.runtime.plugable.SerializationDelegate;
++import org.apache.flink.runtime.util.profiling.MetricsManager;
+ import org.apache.flink.streaming.api.operators.Output;
+ import org.apache.flink.streaming.api.watermark.Watermark;
+ import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
+@@ -55,7 +56,8 @@ public class RecordWriterOutput<OUT> implements Output<StreamRecord<OUT>> {
+ 			StreamRecordWriter<SerializationDelegate<StreamRecord<OUT>>> recordWriter,
+ 			TypeSerializer<OUT> outSerializer,
+ 			OutputTag outputTag,
+-			StreamStatusProvider streamStatusProvider) {
++			StreamStatusProvider streamStatusProvider,
++			MetricsManager metricsManager) {
+ 
+ 		checkNotNull(recordWriter);
+ 		this.outputTag = outputTag;
+@@ -64,6 +66,8 @@ public class RecordWriterOutput<OUT> implements Output<StreamRecord<OUT>> {
+ 		this.recordWriter = (StreamRecordWriter<SerializationDelegate<StreamElement>>)
+ 				(StreamRecordWriter<?>) recordWriter;
+ 
++		this.recordWriter.setMetricsManager(metricsManager);
++
+ 		TypeSerializer<StreamElement> outRecordSerializer =
+ 				new StreamElementSerializer<>(outSerializer);
+ 
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/StreamInputProcessor.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/StreamInputProcessor.java
+index 609f8b8..2192473 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/StreamInputProcessor.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/StreamInputProcessor.java
+@@ -39,6 +39,7 @@ import org.apache.flink.runtime.metrics.groups.OperatorMetricGroup;
+ import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
+ import org.apache.flink.runtime.plugable.DeserializationDelegate;
+ import org.apache.flink.runtime.plugable.NonReusingDeserializationDelegate;
++import org.apache.flink.runtime.util.profiling.MetricsManager;
+ import org.apache.flink.streaming.api.CheckpointingMode;
+ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+ import org.apache.flink.streaming.api.watermark.Watermark;
+@@ -103,6 +104,11 @@ public class StreamInputProcessor<IN> {
+ 	private long lastEmittedWatermark;
+ 	private Counter numRecordsIn;
+ 
++	private MetricsManager metricsManager;
++	private long deserializationDuration = 0;
++	private long processingDuration = 0;
++	private long recordsProcessed = 0;
++
+ 	private boolean isFinished;
+ 
+ 	@SuppressWarnings("unchecked")
+@@ -174,7 +180,9 @@ public class StreamInputProcessor<IN> {
+ 
+ 		while (true) {
+ 			if (currentRecordDeserializer != null) {
++				long start = System.nanoTime();
+ 				DeserializationResult result = currentRecordDeserializer.getNextRecord(deserializationDelegate);
++				deserializationDuration += System.nanoTime() - start;
+ 
+ 				if (result.isBufferConsumed()) {
+ 					currentRecordDeserializer.getCurrentBuffer().recycle();
+@@ -185,8 +193,11 @@ public class StreamInputProcessor<IN> {
+ 					StreamElement recordOrMark = deserializationDelegate.getInstance();
+ 
+ 					if (recordOrMark.isWatermark()) {
++						long processingStart = System.nanoTime();
+ 						// handle watermark
+ 						statusWatermarkValve.inputWatermark(recordOrMark.asWatermark(), currentChannel);
++						processingDuration += System.nanoTime() - processingStart;
++						recordsProcessed++;
+ 						continue;
+ 					} else if (recordOrMark.isStreamStatus()) {
+ 						// handle stream status
+@@ -204,19 +215,37 @@ public class StreamInputProcessor<IN> {
+ 						synchronized (lock) {
+ 							numRecordsIn.inc();
+ 							streamOperator.setKeyContextElement1(record);
++
++							long processingStart = System.nanoTime();
+ 							streamOperator.processElement(record);
++							processingDuration += System.nanoTime() - processingStart;
++							recordsProcessed++;
+ 						}
+ 						return true;
+ 					}
+ 				}
+ 			}
+ 
++			// the buffer got empty
++			if (deserializationDuration > 0) {
++				// inform the MetricsManager that the buffer is consumed
++				metricsManager.inputBufferConsumed(System.nanoTime(), deserializationDuration, processingDuration, recordsProcessed);
++
++				deserializationDuration = 0;
++				processingDuration = 0;
++				recordsProcessed = 0;
++			}
++
+ 			final BufferOrEvent bufferOrEvent = barrierHandler.getNextNonBlocked();
+ 			if (bufferOrEvent != null) {
+ 				if (bufferOrEvent.isBuffer()) {
++
+ 					currentChannel = bufferOrEvent.getChannelIndex();
+ 					currentRecordDeserializer = recordDeserializers[currentChannel];
+ 					currentRecordDeserializer.setNextBuffer(bufferOrEvent.getBuffer());
++
++					// inform the MetricsManager that we got a new input buffer
++					metricsManager.newInputBuffer(System.nanoTime());
+ 				}
+ 				else {
+ 					// Event received
+@@ -305,4 +334,9 @@ public class StreamInputProcessor<IN> {
+ 		}
+ 	}
+ 
++	public void setMetricsManager(MetricsManager metricsManager) {
++		this.metricsManager = metricsManager;
++	}
++
+ }
++
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/StreamTwoInputProcessor.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/StreamTwoInputProcessor.java
+index 7874147..d4aee4a 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/StreamTwoInputProcessor.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/io/StreamTwoInputProcessor.java
+@@ -39,6 +39,7 @@ import org.apache.flink.runtime.metrics.groups.OperatorMetricGroup;
+ import org.apache.flink.runtime.metrics.groups.TaskIOMetricGroup;
+ import org.apache.flink.runtime.plugable.DeserializationDelegate;
+ import org.apache.flink.runtime.plugable.NonReusingDeserializationDelegate;
++import org.apache.flink.runtime.util.profiling.MetricsManager;
+ import org.apache.flink.streaming.api.CheckpointingMode;
+ import org.apache.flink.streaming.api.operators.TwoInputStreamOperator;
+ import org.apache.flink.streaming.api.watermark.Watermark;
+@@ -119,6 +120,12 @@ public class StreamTwoInputProcessor<IN1, IN2> {
+ 
+ 	private Counter numRecordsIn;
+ 
++	private MetricsManager metricsManager;
++
++	private long deserializationDuration = 0;
++	private long processingDuration = 0;
++	private long recordsProcessed = 0;
++
+ 	private boolean isFinished;
+ 
+ 	@SuppressWarnings("unchecked")
+@@ -142,7 +149,7 @@ public class StreamTwoInputProcessor<IN1, IN2> {
+ 			if (!(maxAlign == -1 || maxAlign > 0)) {
+ 				throw new IllegalConfigurationException(
+ 						TaskManagerOptions.TASK_CHECKPOINT_ALIGNMENT_BYTES_LIMIT.key()
+-								+ " must be positive or -1 (infinite)");
++							+ " must be positive or -1 (infinite)");
+ 			}
+ 			this.barrierHandler = new BarrierBuffer(inputGate, ioManager, maxAlign);
+ 		}
+@@ -205,13 +212,16 @@ public class StreamTwoInputProcessor<IN1, IN2> {
+ 		}
+ 
+ 		while (true) {
++
+ 			if (currentRecordDeserializer != null) {
+ 				DeserializationResult result;
++				long start = System.nanoTime();
+ 				if (currentChannel < numInputChannels1) {
+ 					result = currentRecordDeserializer.getNextRecord(deserializationDelegate1);
+ 				} else {
+ 					result = currentRecordDeserializer.getNextRecord(deserializationDelegate2);
+ 				}
++				deserializationDuration += System.nanoTime() - start;
+ 
+ 				if (result.isBufferConsumed()) {
+ 					currentRecordDeserializer.getCurrentBuffer().recycle();
+@@ -240,7 +250,11 @@ public class StreamTwoInputProcessor<IN1, IN2> {
+ 							synchronized (lock) {
+ 								numRecordsIn.inc();
+ 								streamOperator.setKeyContextElement1(record);
+-								streamOperator.processElement1(record);
++
++								long processingStart = System.nanoTime();
++								streamOperator.processElement1(recordOrWatermark.<IN1>asRecord());
++								processingDuration += System.nanoTime() - processingStart;
++								recordsProcessed++;
+ 							}
+ 							return true;
+ 
+@@ -267,7 +281,11 @@ public class StreamTwoInputProcessor<IN1, IN2> {
+ 							synchronized (lock) {
+ 								numRecordsIn.inc();
+ 								streamOperator.setKeyContextElement2(record);
+-								streamOperator.processElement2(record);
++
++								long processingStart = System.nanoTime();
++								streamOperator.processElement2(recordOrWatermark.<IN2>asRecord());
++								processingDuration += System.nanoTime() - processingStart;
++								recordsProcessed++;
+ 							}
+ 							return true;
+ 						}
+@@ -275,14 +293,28 @@ public class StreamTwoInputProcessor<IN1, IN2> {
+ 				}
+ 			}
+ 
++			// the buffer got empty
++			if (deserializationDuration > 0) {
++				// inform the MetricsManager that the buffer is consumed
++				metricsManager.inputBufferConsumed(System.nanoTime(), deserializationDuration, processingDuration, recordsProcessed);
++
++				deserializationDuration = 0;
++				processingDuration = 0;
++				recordsProcessed = 0;
++			}
++
+ 			final BufferOrEvent bufferOrEvent = barrierHandler.getNextNonBlocked();
+ 			if (bufferOrEvent != null) {
+ 
+ 				if (bufferOrEvent.isBuffer()) {
++
+ 					currentChannel = bufferOrEvent.getChannelIndex();
+ 					currentRecordDeserializer = recordDeserializers[currentChannel];
+ 					currentRecordDeserializer.setNextBuffer(bufferOrEvent.getBuffer());
+ 
++					// inform the MetricsManager that we got a new input buffer
++					metricsManager.newInputBuffer(System.nanoTime());
++
+ 				} else {
+ 					// Event received
+ 					final AbstractEvent event = bufferOrEvent.getEvent();
+@@ -423,4 +455,8 @@ public class StreamTwoInputProcessor<IN1, IN2> {
+ 			}
+ 		}
+ 	}
++
++	public void setMetricsManager(MetricsManager metricsManager) {
++		this.metricsManager = metricsManager;
++	}
+ }
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/OneInputStreamTask.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/OneInputStreamTask.java
+index f461e31..de08559 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/OneInputStreamTask.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/OneInputStreamTask.java
+@@ -58,6 +58,9 @@ public class OneInputStreamTask<IN, OUT> extends StreamTask<OUT, OneInputStreamO
+ 
+ 			// make sure that stream tasks report their I/O statistics
+ 			inputProcessor.setMetricGroup(getEnvironment().getMetricGroup().getIOMetricGroup());
++
++			// pass on the MetricsManager
++			inputProcessor.setMetricsManager(getMetricsManager());
+ 		}
+ 	}
+ 
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/OperatorChain.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/OperatorChain.java
+index a44cffb..726710e 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/OperatorChain.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/OperatorChain.java
+@@ -28,6 +28,7 @@ import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
+ import org.apache.flink.runtime.io.network.api.writer.ResultPartitionWriter;
+ import org.apache.flink.runtime.metrics.groups.OperatorMetricGroup;
+ import org.apache.flink.runtime.plugable.SerializationDelegate;
++import org.apache.flink.runtime.util.profiling.MetricsManager;
+ import org.apache.flink.streaming.api.collector.selector.CopyingDirectedOutput;
+ import org.apache.flink.streaming.api.collector.selector.DirectedOutput;
+ import org.apache.flink.streaming.api.collector.selector.OutputSelector;
+@@ -115,7 +116,8 @@ public class OperatorChain<OUT, OP extends StreamOperator<OUT>> implements Strea
+ 					chainedConfigs.get(outEdge.getSourceId()),
+ 					i,
+ 					containingTask.getEnvironment(),
+-					containingTask.getName());
++					containingTask.getName(),
++					containingTask.getMetricsManager());
+ 
+ 				this.streamOutputs[i] = streamOutput;
+ 				streamOutputMap.put(outEdge, streamOutput);
+@@ -372,7 +374,8 @@ public class OperatorChain<OUT, OP extends StreamOperator<OUT>> implements Strea
+ 			StreamConfig upStreamConfig,
+ 			int outputIndex,
+ 			Environment taskEnvironment,
+-			String taskName) {
++			String taskName,
++			MetricsManager metricsManager) {
+ 		OutputTag sideOutputTag = edge.getOutputTag(); // OutputTag, return null if not sideOutput
+ 
+ 		TypeSerializer outSerializer = null;
+@@ -405,7 +408,7 @@ public class OperatorChain<OUT, OP extends StreamOperator<OUT>> implements Strea
+ 				new StreamRecordWriter<>(bufferWriter, outputPartitioner, upStreamConfig.getBufferTimeout());
+ 		output.setMetricGroup(taskEnvironment.getMetricGroup().getIOMetricGroup());
+ 
+-		return new RecordWriterOutput<>(output, outSerializer, sideOutputTag, this);
++		return new RecordWriterOutput<>(output, outSerializer, sideOutputTag, this, metricsManager);
+ 	}
+ 
+ 	// ------------------------------------------------------------------------
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/StreamTask.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/StreamTask.java
+index 6ae45c6..64c619b 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/StreamTask.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/StreamTask.java
+@@ -46,6 +46,7 @@ import org.apache.flink.runtime.state.OperatorStateBackend;
+ import org.apache.flink.runtime.state.OperatorStateHandle;
+ import org.apache.flink.runtime.state.StateBackend;
+ import org.apache.flink.runtime.taskmanager.DispatcherThreadFactory;
++import org.apache.flink.runtime.util.profiling.MetricsManager;
+ import org.apache.flink.streaming.api.TimeCharacteristic;
+ import org.apache.flink.streaming.api.graph.StreamConfig;
+ import org.apache.flink.streaming.api.operators.OperatorSnapshotResult;
+@@ -490,6 +491,10 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
+ 		return getEnvironment().getTaskInfo().getTaskNameWithSubtasks();
+ 	}
+ 
++	public MetricsManager getMetricsManager() {
++		return getEnvironment().getMetricsManager();
++	}
++
+ 	/**
+ 	 * Gets the lock object on which all operations that involve data and state mutation have to lock.
+ 	 * @return The checkpoint lock object.
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/TwoInputStreamTask.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/TwoInputStreamTask.java
+index 68722db..919b6de 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/TwoInputStreamTask.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/main/java/org/apache/flink/streaming/runtime/tasks/TwoInputStreamTask.java
+@@ -81,6 +81,9 @@ public class TwoInputStreamTask<IN1, IN2, OUT> extends StreamTask<OUT, TwoInputS
+ 
+ 		// make sure that stream tasks report their I/O statistics
+ 		inputProcessor.setMetricGroup(getEnvironment().getMetricGroup().getIOMetricGroup());
++		// pass on the MetricsManager
++		inputProcessor.setMetricsManager(getMetricsManager());
++
+ 	}
+ 
+ 	@Override
+diff --git a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/test/java/org/apache/flink/streaming/runtime/tasks/StreamMockEnvironment.java b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/test/java/org/apache/flink/streaming/runtime/tasks/StreamMockEnvironment.java
+index 231f59e..ec1b520 100644
+--- a/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/test/java/org/apache/flink/streaming/runtime/tasks/StreamMockEnvironment.java
++++ b/workspace/flink-1.4.1-instrumented/flink-1.4.1/flink-streaming-java/src/test/java/org/apache/flink/streaming/runtime/tasks/StreamMockEnvironment.java
+@@ -54,6 +54,7 @@ import org.apache.flink.runtime.query.KvStateRegistry;
+ import org.apache.flink.runtime.query.TaskKvStateRegistry;
+ import org.apache.flink.runtime.taskmanager.TaskManagerRuntimeInfo;
+ import org.apache.flink.runtime.util.TestingTaskManagerRuntimeInfo;
++import org.apache.flink.runtime.util.profiling.MetricsManager;
+ 
+ import org.mockito.invocation.InvocationOnMock;
+ import org.mockito.stubbing.Answer;
+@@ -304,6 +305,11 @@ public class StreamMockEnvironment implements Environment {
+ 	}
+ 
+ 	@Override
++	public MetricsManager getMetricsManager() {
++		return null;
++	}
++
++	@Override
+ 	public JobVertexID getJobVertexId() {
+ 		return new JobVertexID(new byte[16]);
+ 	}
+-- 
+2.7.4
+
