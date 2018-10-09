@@ -8,3 +8,8 @@ This repository contains the following DS2 components:
 * The **Apache Flink 1.4.1 instrumentation patch** contains the necessary instrumentation for Flink to be integrated with DS2.
 
 DS2 can be integrated with any dataflow stream processor as long as it can provide the instrumentation and metrics that its scaling policy requires. For more details on required metrics and integration, please see the [OSDI'18 paper](https://www.usenix.org/system/files/osdi18-kalavri.pdf).
+
+## License
+
+SnailTrail is primarily distributed under the terms of both the MIT license and the Apache License (Version 2.0).
+See LICENSE-APACHE, and LICENSE-MIT for details.
