@@ -11,5 +11,5 @@ DS2 can be integrated with any dataflow stream processor as long as it can provi
 
 ## License
 
-SnailTrail is primarily distributed under the terms of both the MIT license and the Apache License (Version 2.0).
+DS2 is primarily distributed under the terms of both the MIT license and the Apache License (Version 2.0).
 See LICENSE-APACHE, and LICENSE-MIT for details.
