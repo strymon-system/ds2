@@ -1,0 +1,5 @@
+# operator_id1,operator_name1,total_number_of_operator_instances1,operator_id2,operator_name2,total_number_of_operator_instances2 
+Source: Custom Source: Auctions -> Timestamps-Watermarks,Source: Custom Source: Auctions -> Timestamps-Watermarks,6,Auction Window,Auction Window,16
+Source: Custom Source: Persons -> Timestamps-Watermarks,Source: Custom Source: Persons -> Timestamps-Watermarks,4,Person Window,Person Window,16
+Auction Window,Auction Window,16,Tumbling Window Join -> Latency Sink,Tumbling Window Join -> Latency Sink,16
+Person Window,Person Window,16,Tumbling Window Join -> Latency Sink,Tumbling Window Join -> Latency Sink,16

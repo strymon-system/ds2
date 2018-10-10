@@ -1,0 +1,3 @@
+# source_operator_name,output_rate_per_instance (records/s)
+Source: Custom Source: Auctions -> Timestamps-Watermarks,70000
+Source: Custom Source: Persons -> Timestamps-Watermarks,30000

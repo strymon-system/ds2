@@ -1,0 +1,76 @@
+##### DS2 configuration settings #####
+##########################################
+# This configuration file is used to manage the behavior of DS2
+
+[system]
+# Id of the streaming dataflow system that is being controlled by DS2.
+# E.g. "Flink", "Heron", "Timely"
+#
+id = "Flink"
+
+[paths]
+# Path to the file containing the initial physical dataflow (required).
+# See: examples/topology/
+#
+#topology = "examples/topology/flink_topology.csv"
+
+# Directory of the metrics repository containing rate files (required).
+# DS2 expects one rate file per policy interval (epoch) with the following
+# naming convention: 'rates-epoch_number.log'
+# See: examples/metrics_repo/
+#
+#metrics_repo = "examples/metrics_repo/"
+
+# Path to the CSV file containing the external source rates.
+# These are the true rates of all data sources as measured
+# outside the streaming system (required).
+# See: examples/source_rates/
+#
+#source_rates = "examples/source_rates/source_rates.csv"
+
+# Path to the system-specific bash script that is responsible
+# for applying the new configuration (required).
+# See: examples/system_scripts/
+#
+#reconfiguration_script = "../flink-scaling-scripts/change-wordcount-parallelism.sh"
+
+# Path to the system-specific bash script that is responsible
+# for starting the application (required).
+# See: ../flink-scaling-scripts/
+#
+#start_script = "../flink-scaling-scripts/start-wordcount.sh"
+
+# Extension of rate files as stored in the metrics repository,
+# E.g. "txt", "log", "csv", etc. (required)
+#
+file_extension = "log"
+
+[scaling_manager]
+# Time window (in seconds) at which rates are gathered
+# and the scaling policy is invoked (required).
+#
+policy_interval = 10
+
+# Number of consecutive policy decisions considered before
+# issuing a re-configuration (default value: 1).
+#
+#activation_time = 1
+
+# Number of consecutive policy intervals (epochs) to ignore
+# after a re-configuration (required).
+#
+warm_up_time = 2
+
+# Target rate ratio threshold (>= 1) defines the maximum allowed ratio
+# of a target source rate to the respective observed source rate
+# after a re-configuration. When DS2 converges and the aforementioned
+# ratio for a source operator is above the specified threshold,
+# a final configuration adjustment is triggered in an attempt
+# to meet the required throughput (default value: f64::MAX)
+#
+#target_rate_ratio_threshold = 1.0
+
+# Scaling factor (>= 0) is used to deliberately over-provision each
+# dataflow operator by factor * 100% more instances than the optimal (default value: 0).
+#
+#scaling_factor = 0
