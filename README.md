@@ -43,7 +43,7 @@ DS2 scaling policy can also be invoked offline on a collection of metrics genera
 * A file containing the dataflow configuration, e.g. `examples/offline/flink_wordcount_topology.csv`, and
 * A log file with the collected operator rates for one or more time windows (epochs), e.g. `examples/offline/flink_rates.log`
 
-The following command evaluates the scaling policy for each time window in the rate file assuming Flink as the running system:
+The following command evaluates the scaling policy for each epoch in the rate file assuming Flink as the running system:
 
 ```bash
 $ cargo run --release --bin policy -- --topo examples/offline/flink_wordcount_topology.csv --rates examples/offline/flink_rates.log --system flink
