@@ -49,7 +49,7 @@
 # Time window (in seconds) at which rates are gathered
 # and the scaling policy is invoked (required).
 #
-policy_interval = 10
+#policy_interval = 10
 
 # Number of consecutive policy decisions considered before
 # issuing a re-configuration (default value: 1).
@@ -59,7 +59,7 @@ policy_interval = 10
 # Number of consecutive policy intervals (epochs) to ignore
 # after a re-configuration (required).
 #
-warm_up_time = 2
+#warm_up_time = 2
 
 # Target rate ratio threshold (>= 1) defines the maximum allowed ratio
 # of a target source rate to the respective observed source rate
