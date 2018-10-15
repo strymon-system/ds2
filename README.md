@@ -34,7 +34,7 @@ $ cargo run --release --bin manager
 
 On success, the scaling manager starts monitoring the specified metrics repository and performs the following actions:
 
-* Updates its state every time a new rate file is created by the instrumented system. The scaling manager expects _exactly one rate file per operator instance and time window (epoch)_ following the naming convention "some_name-epoch_number.file_extension". Example rate files generated with [this path](https://github.com/strymon-system/ds2/tree/master/flink-instrumentation) for Flink can be found [here](https://github.com/strymon-system/ds2/tree/master/controller/examples/flink_wordcount_rates).
+* Updates its state every time a new rate file is created by the instrumented system. The scaling manager expects _exactly one rate file per operator instance and time window (epoch)_ following the naming convention "some_name-epoch_number.file_extension". Example rate files generated with [this patch](https://github.com/strymon-system/ds2/tree/master/flink-instrumentation) for Flink can be found [here](https://github.com/strymon-system/ds2/tree/master/controller/examples/flink_wordcount_rates).
 * Invokes the scaling policy periodically according to the particular configuration.
 * Re-configures the streaming system automatically. To start and re-configure the running system, you must write two respective bash scripts, such as [these scripts](https://github.com/strymon-system/ds2/tree/master/flink-scaling-scripts) for Flink.
 
