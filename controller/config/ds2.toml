@@ -15,8 +15,8 @@ id = "Flink"
 #topology = "examples/topology/flink_topology.csv"
 
 # Directory of the metrics repository containing rate files (required).
-# DS2 expects one rate file per policy interval (epoch) with the following
-# naming convention: 'some_name-epoch_number.log'
+# DS2 expects one rate file per operator instance and policy interval (epoch) 
+# with the following naming convention: 'some_name-epoch_number.log'
 # See: examples/flink_wordcount_rates/
 #
 #metrics_repo = "examples/flink_wordcount_rates/"
