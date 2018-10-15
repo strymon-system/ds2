@@ -41,7 +41,7 @@ Upon successful configuration, the scaling manager starts monitoring the specifi
 DS2 scaling policy can also be invoked offline on a collection of metrics generated during the execution of a dataflow. To do so, you need:
 
 * A file containing the configuration of the executed dataflow.
-* A log file with the collected operator rates for one or more time windows (epochs).
+* A log file with the collected operator rates for one or more policy intervals (epochs).
 
 As an example, go to `controller/` and run:
 
