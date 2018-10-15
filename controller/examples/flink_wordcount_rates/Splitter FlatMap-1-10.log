@@ -1,1 +1,2 @@
+# operator_id,operator_instance_id,total_number_of_operator_instances,epoch_timestamp,true_processing_rate,true_output_rate,observed_processing_rate,observed_output_rate
 Splitter FlatMap,1,2,116013292483622,123642.09243219785,1256085.6872017821,40046.17887772376,406830.9677225428

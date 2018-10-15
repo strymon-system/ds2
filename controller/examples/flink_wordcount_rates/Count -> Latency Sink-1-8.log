@@ -1,1 +1,2 @@
+# operator_id,operator_instance_id,total_number_of_operator_instances,epoch_timestamp,true_processing_rate,true_output_rate,observed_processing_rate,observed_output_rate
 Count -> Latency Sink,1,1,115993253414616,1633845.912027327,0.0,813029.5063096083,0.0

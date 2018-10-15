@@ -1,0 +1,3 @@
+# operator_id1,operator_name1,total_number_of_operator_instances1,operator_id2,operator_name2,total_number_of_operator_instances2 
+Source: Custom Source,Source: Custom Source,1,Splitter FlatMap,Splitter FlatMap,2
+Splitter FlatMap,Splitter FlatMap,2,Count -> Latency Sink,Count -> Latency Sink,1

@@ -16,10 +16,10 @@ id = "Flink"
 
 # Directory of the metrics repository containing rate files (required).
 # DS2 expects one rate file per policy interval (epoch) with the following
-# naming convention: 'rates-epoch_number.log'
-# See: examples/metrics_repo/
+# naming convention: 'some_name-epoch_number.log'
+# See: examples/flink_wordcount_rates/
 #
-#metrics_repo = "examples/metrics_repo/"
+#metrics_repo = "examples/flink_wordcount_rates/"
 
 # Path to the CSV file containing the external source rates.
 # These are the true rates of all data sources as measured

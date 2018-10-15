@@ -1,1 +1,2 @@
+# operator_id,operator_instance_id,total_number_of_operator_instances,epoch_timestamp,true_processing_rate,true_output_rate,observed_processing_rate,observed_output_rate
 Source: Custom Source,1,1,115963235065655,0,109705.37486387165,0,79940.07986534949
