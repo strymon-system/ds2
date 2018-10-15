@@ -32,11 +32,11 @@ There are two ways to execute DS2: _online_ and _offline_. To run DS2 online, fo
 $ cargo run --release --bin manager
 ```
 
-Upon successful configuration, the scaling manager starts monitoring the specified metrics repository and performs the following actions:
+On success, the scaling manager starts monitoring the specified metrics repository and performs the following actions:
 
-* Updates its state every time a new rate file is created by the instrumented system. The scaling manager expects exactly one rate file per operator instance and time window (epoch) following the naming convention 'some_name-epoch_number.file_extension'. Example rate files generated with [this path](https://github.com/strymon-system/ds2/tree/master/flink-instrumentation) for Flink can be found [here](https://github.com/strymon-system/ds2/tree/master/controller/examples/flink_wordcount_rates).
+* Updates its state every time a new rate file is created by the instrumented system. The scaling manager expects _exactly one rate file per operator instance and time window (epoch)_ following the naming convention "some_name-epoch_number.file_extension". Example rate files generated with [this path](https://github.com/strymon-system/ds2/tree/master/flink-instrumentation) for Flink can be found [here](https://github.com/strymon-system/ds2/tree/master/controller/examples/flink_wordcount_rates).
 * Invokes the scaling policy periodically according to the particular configuration.
-* Re-configures the streaming system automatically. To start and re-configure the running system, you must write two respective bash scripts, such as [these](https://github.com/strymon-system/ds2/tree/master/flink-scaling-scripts) for Flink.
+* Re-configures the streaming system automatically. To start and re-configure the running system, you must write two respective bash scripts, such as [these scripts](https://github.com/strymon-system/ds2/tree/master/flink-scaling-scripts) for Flink.
 
 DS2 scaling policy can also be invoked offline on a collection of metrics generated during the execution of a dataflow. To do so, you need:
 
