@@ -34,21 +34,21 @@ $ cargo run --release --bin manager
 
 Upon successful configuration, the scaling manager starts monitoring the specified metrics repository and performs the following actions:
 
-* Updates its state every time a new rate file is created by the instrumented system. The scaling manager expects exactly one rate file per operator instance and time window (epoch) following the naming convention 'some_name-epoch_number.file_extension'. Epoch numbers can be arbitrary. Example rate files generated with [this](https://github.com/strymon-system/ds2/tree/master/flink-instrumentation) patch for Flink can be found [here](https://github.com/strymon-system/ds2/tree/master/controller/examples/flink_wordcount_rates).
+* Updates its state every time a new rate file is created by the instrumented system. The scaling manager expects exactly one rate file per operator instance and time window (epoch) following the naming convention 'some_name-epoch_number.file_extension'. Example rate files generated with [this path](https://github.com/strymon-system/ds2/tree/master/flink-instrumentation) for Flink can be found [here](https://github.com/strymon-system/ds2/tree/master/controller/examples/flink_wordcount_rates).
 * Invokes the scaling policy periodically according to the particular configuration.
-* Re-configures the streaming system automatically. To start and re-configure the running system, you must write two system-specific bash scripts, such as [these](https://github.com/strymon-system/ds2/tree/master/flink-scaling-scripts) for Flink.
+* Re-configures the streaming system automatically. To start and re-configure the running system, you must write two respective bash scripts, such as [these](https://github.com/strymon-system/ds2/tree/master/flink-scaling-scripts) for Flink.
 
 DS2 scaling policy can also be invoked offline on a collection of metrics generated during the execution of a dataflow. To do so, you need:
 
-* A file containing the configuration of the executed dataflow (see [this](https://github.com/strymon-system/ds2/blob/master/controller/examples/offline/flink_wordcount_topology.csv) Flink wordcount topology configuration).
-* A log file with the collected operator rates for one or more time windows (epochs) (see [this](https://github.com/strymon-system/ds2/blob/master/controller/examples/offline/flink_rates.log) Flink rate file).
+* A file containing the configuration of the executed dataflow.
+* A log file with the collected operator rates for one or more time windows (epochs).
 
 As an example, go to `controller/` and run:
 
 ```bash
 $ cargo run --release --bin policy -- --topo examples/offline/flink_wordcount_topology.csv --rates examples/offline/flink_rates.log --system flink
 ```
-This command evaluates the scaling policy for each of the two epochs in the provided rate file assuming Flink as the running system.
+This command evaluates the scaling policy on the `--topo` topology for each epoch included in the `--rates` file assuming Flink as the streaming system.
 
 For more information about offline execution parameters, try `--help` as follows:
 
