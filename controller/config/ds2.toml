@@ -10,40 +10,40 @@ id = "Flink"
 
 [paths]
 # Path to the file containing the initial physical dataflow (required).
-# See: examples/topology/
+# See: ../examples/topology/
 #
 #topology = "examples/topology/flink_topology.csv"
 
 # Directory of the metrics repository containing rate files (required).
 # DS2 expects one rate file per operator instance and policy interval (epoch) 
-# with the following naming convention: 'some_name-epoch_number.log'
-# See: examples/flink_wordcount_rates/
+# with the following naming convention: 'some_name-epoch_number.file_extension'
+# See: ../examples/flink_wordcount_rates/
 #
 #metrics_repo = "examples/flink_wordcount_rates/"
-
-# Path to the CSV file containing the external source rates.
-# These are the true rates of all data sources as measured
-# outside the streaming system (required).
-# See: examples/source_rates/
-#
-#source_rates = "examples/source_rates/source_rates.csv"
-
-# Path to the system-specific bash script that is responsible
-# for applying the new configuration (required).
-# See: examples/system_scripts/
-#
-#reconfiguration_script = "../flink-scaling-scripts/change-wordcount-parallelism.sh"
-
-# Path to the system-specific bash script that is responsible
-# for starting the application (required).
-# See: ../flink-scaling-scripts/
-#
-#start_script = "../flink-scaling-scripts/start-wordcount.sh"
 
 # Extension of rate files as stored in the metrics repository,
 # E.g. "txt", "log", "csv", etc. (required)
 #
 file_extension = "log"
+
+# Path to the CSV file containing the external source rates.
+# These are the true rates of all data sources as measured
+# outside the streaming system (required).
+# See: ../examples/source_rates/
+#
+#source_rates = "examples/source_rates/source_rates.csv"
+
+# Path to the system-specific bash script that is responsible
+# for applying the new configuration (required).
+# See: ../../flink-scaling-scripts/
+#
+#reconfiguration_script = "../flink-scaling-scripts/change-wordcount-parallelism.sh"
+
+# Path to the system-specific bash script that is responsible
+# for starting the application (required).
+# See: ../../flink-scaling-scripts/
+#
+#start_script = "../flink-scaling-scripts/start-wordcount.sh"
 
 [scaling_manager]
 # Time window (in seconds) at which rates are gathered
