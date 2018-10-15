@@ -6,7 +6,7 @@
 # Id of the streaming dataflow system that is being controlled by DS2.
 # E.g. "Flink", "Heron", "Timely"
 #
-id = "Flink"
+#id = "Flink"
 
 [paths]
 # Path to the file containing the initial physical dataflow (required).
