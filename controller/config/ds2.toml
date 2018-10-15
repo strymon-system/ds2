@@ -24,7 +24,7 @@ id = "Flink"
 # Extension of rate files as stored in the metrics repository,
 # E.g. "txt", "log", "csv", etc. (required)
 #
-file_extension = "log"
+#file_extension = "log"
 
 # Path to the CSV file containing the external source rates.
 # These are the true rates of all data sources as measured
