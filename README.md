@@ -55,7 +55,7 @@ For more information on offline execution parameters, run:
 $ cargo run --release --bin policy -- --help
 ```
 
-Example input files for both online and offline DS2 execution are provided in `controller/examples`.
+Example input files for both online and offline DS2 execution are provided [here](https://github.com/strymon-system/ds2/tree/master/controller/examples).
 
 ## Documentation
 
