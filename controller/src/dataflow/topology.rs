@@ -41,7 +41,7 @@ impl Operator
 
 pub struct Flow
 {
-    // (john) TODO
+    // TODO (john) 
 }
 
 pub struct Topology
@@ -181,17 +181,7 @@ impl Topology
 		self.logical_graph[slot.0].instances = *inst;
       }
     }
-/*
-    /// Retrieves the most recently estimated optimal configuration
-    pub fn last_scaling_decision(&self) -> Vec<(OperatorId,OperatorInstances)>
-    {
-        let dict = &self.dictionary;
-        self.logical_graph.raw_nodes().iter()
-                        // If no optimal parallelism has been estimated (for source operators), return the current number of instances from the dictionary
-                        .map(|node| (node.weight.id.clone(), *node.weight.optimal_parallelism_per_epoch.iter().last().unwrap_or(&dict.get(&node.weight.id).expect("Operator not found in topology").1)))
-                        .collect()
-    }
-*/
+
     /// Prints the topology to standard output
     pub fn print(&self)
     {

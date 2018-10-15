@@ -141,7 +141,7 @@ fn collect_logs(rates_file: &Path, topology: &Topology) -> HashMap<OperatorId,Ha
     logs
 }
 
-/// Sets rate information in a topology
+/// Sets operator rates in a topology
 ///
 /// # Arguments
 ///
@@ -226,7 +226,7 @@ fn update_rates(topology: &mut Topology, mut logs: HashMap<OperatorId,HashMap<Op
     }
 }
 
-/// Parses Flink operator rates from a CSV file and updates a topology
+/// Parses rates of Flink operators from a CSV file and updates a topology
 ///
 /// # Arguments
 ///
@@ -434,14 +434,13 @@ pub fn create_timely_topology(file: &Path) -> Topology
     {
         match instances == usize::max_value()
         {
-            false => assert_eq!(instances,workers.len()),	// All operators in Timely must have the same number of instances
+            false => assert_eq!(instances,workers.len()),	// All operators in Timely have the same number of instances
             true => instances = workers.len()
         }
         let _ = topology.add_unique_node(&op_id[..],&name[..],workers.len() as u32);
     }
     for (c,s,t) in edges.drain()
-    {
-        // Map local operator ids to global ones
+    { // Map local operator ids to global ones
         let s_op_uid = op_id_mapping.get(&s).expect("No unique id found for source operator.");
         let t_op_uid = op_id_mapping.get(&t).expect("No unique id found for target operator.");
         let &(n1,_) = topology.dictionary.get(&s_op_uid[..]).expect("Source operator was not found in dictionary.");

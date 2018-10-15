@@ -37,7 +37,7 @@ fn format_flink_configuration(conf: &Vec<(OperatorId,OperatorInstances)>) -> Str
 
 /// Decides whether the change in the dataflow configuration is 'significant'
 ///
-/// #Comments
+/// # Comments
 ///
 /// * Operators in `before` and `after` are expected to be in the same order
 fn consider_change(before: &Vec<(OperatorId,OperatorInstances)>, after: &Vec<(OperatorId,OperatorInstances)>) -> bool
@@ -54,10 +54,10 @@ fn consider_change(before: &Vec<(OperatorId,OperatorInstances)>, after: &Vec<(Op
 
 /// Configures and runs a new scaling manager
 ///
-/// #Comments
+/// # Comments
 ///
-/// * The scaling manager configuration is specified in `config/ds2.toml`
-fn main() -> notify::Result<()>
+/// * Use `config/ds2.toml` to configure the scaling manager
+pub fn main() -> notify::Result<()>
 {
     // Includes paths to necessary files, scripts, the metrics repository, etc. as well as the scaling manager parameters
     let mut conf = Config::new();
@@ -262,7 +262,6 @@ fn main() -> notify::Result<()>
                                     // Step 5: Call re-configuration script if needed and update
                                     // scaling manager's local state upon successful re-deployment
                                     if evaluations >= activation_time &&
-                                       new_conf != conf &&
                                        consider_change(&conf,&new_conf)
                                     {
                                         eprintln!("Reconfiguring...");
@@ -272,7 +271,7 @@ fn main() -> notify::Result<()>
                                                                 .arg(script_argument)
                                                                 .output()
                                                                 .expect("Failed to run re-configuration script.");
-                                        //retrieve new job id
+                                        // Retrieve new job id
                                         job_id = match String::from_utf8(cmd_out.stdout)
                                                     { // Capture all information printed to stdout into a string
                                                         Ok(s) =>

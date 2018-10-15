@@ -8,4 +8,3 @@
 
 pub mod dataflow;
 pub mod policy;
-pub mod manager;

@@ -18,7 +18,12 @@ use clap::{App, Arg};
 use ds2::dataflow::parse::*;
 use ds2::policy::scaling::*;
 
-fn main() {
+/// Invokes the scaling policy once with the given parameters
+///
+/// # Comments
+///
+/// * Policy parameters are given as command line arguments. Use --help
+pub fn main() {
 
     let matches = App::new("DS2")
         .about("DS2 is an automatic scaling controller for distributed streaming dataflow systems.")

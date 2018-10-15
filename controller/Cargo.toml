@@ -15,10 +15,9 @@ name = "ds2"
 path = "src/lib.rs"
 
 [[bin]]
-name = "scaling-policy"
-path = "src/main.rs"
+name = "policy"
+path = "src/bin/scaling-policy.rs"
 
 [[bin]]
-name = "monitor"
-path = "src/monitor.rs"
-
+name = "manager"
+path = "src/bin/manager.rs"
