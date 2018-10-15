@@ -50,7 +50,7 @@ $ cargo run --release --bin policy -- --topo examples/offline/flink_wordcount_to
 ```
 This command evaluates the scaling policy for each of the two epochs in the provided rate file assuming Flink as the running system.
 
-For more information on offline execution parameters, try `--help` as follows:
+For more information about offline execution parameters, try `--help` as follows:
 
 ```bash
 $ cargo run --release --bin policy -- --help
