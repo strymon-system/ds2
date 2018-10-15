@@ -56,11 +56,11 @@ For more information about offline execution parameters, try `--help` as follows
 $ cargo run --release --bin policy -- --help
 ```
 
-Example input files for both online and offline DS2 execution are provided [here](https://github.com/strymon-system/ds2/tree/master/controller/examples).
+Example input files for both online and offline DS2 execution are provided [here](https://github.com/strymon-system/ds2/tree/master/controller/examples), along with the details on their format.
 
 ## Documentation
 
-Detailed DS2 documentation can be found [here](http://strymon.systems.ethz.ch/ds2/doc/ds2/index.html).
+The complete DS2 documentation can be found [here](http://strymon.systems.ethz.ch/ds2/doc/ds2/index.html).
 
 ## License
 
