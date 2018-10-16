@@ -60,7 +60,7 @@ Example input files for both online and offline DS2 execution are provided [here
 
 ## Documentation
 
-The complete DS2 documentation can be found [here](http://strymon.systems.ethz.ch/ds2/doc/ds2/index.html).
+The complete DS2 documentation can be found [here](http://strymon.systems.ethz.ch/ds2/ds2/index.html).
 
 ## License
 
