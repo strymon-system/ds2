@@ -600,6 +600,8 @@ fn set_true_output_rates(topology: &mut Topology, operator_rates: Vec<(OperatorI
 ///
 /// `file`: The path to the CSV file
 ///
+/// `verbose`: A boolean flag to print further information to standard output
+///
 /// # Returns
 ///
 /// A vector of `(OperatorId,Rate)` pairs, where
@@ -631,13 +633,15 @@ fn parse_operator_rates(file: &Path, verbose: bool) -> Vec<(OperatorId,Rate)>
     source_rates
 }
 
-/// Sets true output rates of source operators to the values given in a CSV file
+/// Sets the true output rates of source operators to the values given in a CSV file
 ///
 /// # Arguments
 ///
 /// `file`: The path to the CSV file
 ///
 /// `topology`: The topology struct to update
+///
+/// `verbose`: A boolean flag to print further information to standard output
 ///
 /// # Comments
 ///
