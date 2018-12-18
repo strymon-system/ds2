@@ -12,7 +12,7 @@ DS2 can be integrated with any dataflow stream processor as long as it can provi
 ## Building DS2
 These instructions assume a Unix-like system.
 
-1. DS2 is mainly developed in [Rust](https://www.rust-lang.org). You can install Rust by following [these instructions](https://www.rust-lang.org/downloads.html).
+1. DS2 is mainly developed in [Rust](https://www.rust-lang.org). You can install Rust by following [these instructions](https://www.rust-lang.org/tools/install).
 
 2. Compile the code (dependencies will be fetched automatically):
     ```bash
