@@ -379,7 +379,7 @@ index 0000000..a9359d3
 +					+ observedOutputRate;
 +				List<String> rates = Arrays.asList(ratesLine);
 +
-+				Path ratesFile = Paths.get(ratesPath + workerName.trim() + "-" + instanceId + "-" + epoch).toAbsolutePath();
++				Path ratesFile = Paths.get(ratesPath + workerName.trim() + "-" + instanceId + "-" + epoch + ".log").toAbsolutePath();
 +				try {
 +					Files.write(ratesFile, rates, Charset.forName("UTF-8"));
 +				} catch (IOException e) {
@@ -465,7 +465,7 @@ index 0000000..a9359d3
 +						+ observedOutputRate;
 +					List<String> rates = Arrays.asList(ratesLine);
 +
-+					Path ratesFile = Paths.get(ratesPath + workerName.trim() + "-" + instanceId + "-" + epoch).toAbsolutePath();
++					Path ratesFile = Paths.get(ratesPath + workerName.trim() + "-" + instanceId + "-" + epoch + ".log").toAbsolutePath();
 +					try {
 +						Files.write(ratesFile, rates, Charset.forName("UTF-8"));
 +					} catch (IOException e) {
