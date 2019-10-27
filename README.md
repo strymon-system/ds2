@@ -16,7 +16,7 @@ These instructions assume a Unix-like system.
 
 2. Compile the code (dependencies will be fetched automatically):
     ```bash
-    $ cd ds2/
+    $ cd controller/
     $ cargo build --release --all
     ```
 
