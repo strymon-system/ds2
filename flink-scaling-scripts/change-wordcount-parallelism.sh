@@ -26,7 +26,7 @@ fi
 JOB_ID=$1
 
 ### operators and parallelism
-if [ "$1" == "" ]; then
+if [ "$2" == "" ]; then
     echo "Please provide operators and their initial parallelism as the second argument"
     exit 1
 fi
