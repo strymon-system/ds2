@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["as_vec","Converts a dataflow configuration `conf` to a vector of pairs `(OperatorId,OperatorInstances)`"],["evaluate_scaling_policy","Evaluates the scaling model on a topology with collected metrics"],["evaluate_scaling_policy_at_epoch","Evaluates the scaling model on a topology with collected metrics for a given epoch"]]});

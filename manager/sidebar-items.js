@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["consider_change","Decides whether the change in the dataflow configuration is 'significant'"],["format_flink_configuration","Formats a dataflow configuration for Flink scripts"],["main","Configures and runs a new scaling manager"]]});

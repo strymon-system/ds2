@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["main","Invokes the scaling policy once with the given parameters"]]});

@@ -1,0 +1,19 @@
+(function() {var implementors = {};
+implementors["aho_corasick"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["arrayvec"] = [{"text":"impl&lt;T:&nbsp;Any&gt; Error for CapacityError&lt;T&gt;","synthetic":false,"types":[]}];
+implementors["clap"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["config"] = [{"text":"impl Error for ConfigError","synthetic":false,"types":[]}];
+implementors["ini"] = [{"text":"impl Error for ParseError","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["mio_extras"] = [{"text":"impl&lt;T:&nbsp;Any&gt; Error for SendError&lt;T&gt;","synthetic":false,"types":[]},{"text":"impl&lt;T:&nbsp;Any&gt; Error for TrySendError&lt;T&gt;","synthetic":false,"types":[]}];
+implementors["nom"] = [{"text":"impl&lt;E&gt; Error for Err&lt;E&gt; <span class=\"where fmt-newline\">where<br>&nbsp;&nbsp;&nbsp;&nbsp;E: Debug,&nbsp;</span>","synthetic":false,"types":[]}];
+implementors["notify"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["regex"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["regex_syntax"] = [{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for CaseFoldError","synthetic":false,"types":[]},{"text":"impl Error for UnicodeWordError","synthetic":false,"types":[]}];
+implementors["serde"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["serde_hjson"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["serde_json"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["serde_test"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["toml"] = [{"text":"impl Error for Error","synthetic":false,"types":[]},{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["walkdir"] = [{"text":"impl Error for Error","synthetic":false,"types":[]}];
+implementors["yaml_rust"] = [{"text":"impl Error for EmitError","synthetic":false,"types":[]},{"text":"impl Error for ScanError","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
