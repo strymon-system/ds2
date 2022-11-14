@@ -4,11 +4,11 @@ version = "0.1.0"
 authors = ["ioannisl <ioannis.liagouris@inf.ethz.ch>"]
 
 [dependencies]
-config = "*"
-clap = "*"
-regex = "*"
-petgraph = "*"
-notify = "4.0.0"
+config = "0.11.0"
+clap = "2.34.0"
+regex = "1.7.0"
+petgraph = "0.6.2"
+notify = "4.0.17"
 
 [lib]
 name = "ds2"
